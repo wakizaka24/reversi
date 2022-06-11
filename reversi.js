@@ -6,12 +6,12 @@ var screenSize = {
 
 var pressButtonInfo = {
     key: 'press_button',
-    url: 'assets/press_to_start_50x50.svg',
-    width: 50,
-    height: 50,
+    url: 'assets/reversi_board_500x500.svg',
+    width: 500,
+    height: 500,
     zoomRate: 1,
     offsetRate: {
-        x: 0.1, y: 0.1
+        x: 0.05, y: 0.05
     },
     getZoomSize: function () {
         return {
@@ -44,19 +44,24 @@ var pressButtonInfo = {
     }
 };
 
+function addScreenRateFuncs(info) {
+
+};
+
 var flag = false;
 
 var game = new Phaser.Game({
     type: Phaser.WEBGL,
     width: screenSize.width,
     height: screenSize.height,
-    backgroundColor: '#9adaea',
+    backgroundColor: '#FAF9F6',
     scene: {
         preload: function() {
             {
                 var info = pressButtonInfo;
                 info.seekScreenFitZoomRate(screenSize);
                 var size = info.getZoomSize();
+                console.log(size);
                 this.load.svg(info.key, info.url, {
                     width: size.width,
                     height: size.height
