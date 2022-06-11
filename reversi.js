@@ -1,65 +1,122 @@
-var screenSize = {
+var screenInfo = {
     width: window.innerWidth <= window.innerHeight
         ? window.innerWidth : window.innerHeight,
-    height: window.innerHeight
+    height: window.innerHeight,
+    offsetRate: {
+        x: 0.05, y: 0.05
+    }
 };
 
-var pressButtonInfo = {
-    key: 'press_button',
+var reversiBoardInfo = {
+    key: 'reversi_board',
     url: 'assets/reversi_board_500x500.svg',
     width: 500,
     height: 500,
-    zoomRate: 1,
-    offsetRate: {
-        x: 0.05, y: 0.05
-    },
-    getZoomSize: function () {
+    borderOffsetRate: {
+        x: 0.008, y: 0.008
+    }
+};
+
+var reversiPieceBlackInfo = {
+    key: 'reversi_piece_black',
+    url: 'assets/reversi_piece_black_61x61.svg',
+    width: 61,
+    height: 61
+}
+
+var reversiPieceWhiteInfo = {
+    key: 'reversi_piece_white',
+    url: 'assets/reversi_piece_white_61x61.svg',
+    width: 61,
+    height: 61
+}
+
+function addScreenRateFuncs(info) {
+    info['getOffset'] = function (screenInfo) {
+        return {
+            x: screenInfo.width * screenInfo.offsetRate.x,
+            y: screenInfo.width * screenInfo.offsetRate.y,
+        }
+    };
+
+    info['seekScreenFitZoomRate'] = function (screenInfo) {
+        var offset = this.getOffset(screenInfo);
+        var offsetY = offset.y
+        this['zoomRate'] = (screenInfo.width - offsetY * 2) / this.width;
+    };
+
+    info['getZoomSize'] = function () {
         return {
             width: this.width * this.zoomRate,
             height: this.height * this.zoomRate
         };
-    },
-    getCenter: function () {
+    };
+
+    info['getCenter'] = function () {
         return {
             x: this.getZoomSize().width / 2,
             y: this.getZoomSize().height / 2
         }
-    },
-    getOffset: function (screenSize) {
+    };
+
+    info['getCenterOffset'] = function (screenInfo, zoomSize) {
         return {
-            x: screenSize.width * this.offsetRate.x,
-            y: screenSize.width * this.offsetRate.y,
+            x: (screenInfo.width - zoomSize.width) * 0.5,
+            y: (screenInfo.height - zoomSize.height) * 0.5,
         }
-    },
-    getCenterOffset: function (screenSize, itemSize) {
-        return {
-            x: (screenSize.width - itemSize.width) * 0.5,
-            y: (screenSize.height - itemSize.height) * 0.5,
-        }
-    },
-    seekScreenFitZoomRate: function (screenSize) {
-        var offset = this.getOffset(screenSize);
+    };
+};
+addScreenRateFuncs(reversiBoardInfo);
+addScreenRateFuncs(reversiPieceBlackInfo);
+addScreenRateFuncs(reversiPieceWhiteInfo);
+
+function addBoardPieceRateFuncs(info) {
+    info['seekScreenFitZoomRate'] = function (screenInfo) {
+        var offset = this.getOffset(screenInfo);
         var offsetY = offset.y
-        this['zoomRate'] = (screenSize.width - offsetY * 2) / this.width;
-    }
-};
+        this['zoomRate'] = (screenInfo.width - offsetY * 2) / 8 / this.width;
+    };
 
-function addScreenRateFuncs(info) {
+    info['getBoardIndexOffset'] = function (screenInfo, colIdx, rowIdx) {
+        var zoomSize = this.getZoomSize();
+        return {
+            x: screenInfo.width * screenInfo.offsetRate.x
+                + screenInfo.width * reversiBoardInfo.borderOffsetRate.x
+                + zoomSize.width * colIdx,
+            y: screenInfo.width * screenInfo.offsetRate.y
+                + screenInfo.width * reversiBoardInfo.borderOffsetRate.y
+                + zoomSize.height * rowIdx,
+        }
+    };
 
-};
+
+}
+addBoardPieceRateFuncs(reversiPieceBlackInfo);
+addBoardPieceRateFuncs(reversiPieceWhiteInfo);
 
 var flag = false;
 
 var game = new Phaser.Game({
     type: Phaser.WEBGL,
-    width: screenSize.width,
-    height: screenSize.height,
+    width: screenInfo.width,
+    height: screenInfo.height,
     backgroundColor: '#FAF9F6',
     scene: {
         preload: function() {
             {
-                var info = pressButtonInfo;
-                info.seekScreenFitZoomRate(screenSize);
+                var info = reversiBoardInfo;
+                info.seekScreenFitZoomRate(screenInfo);
+                var size = info.getZoomSize();
+                console.log(size);
+                this.load.svg(info.key, info.url, {
+                    width: size.width,
+                    height: size.height
+                });
+            }
+
+            {
+                var info = reversiPieceBlackInfo;
+                info.seekScreenFitZoomRate(screenInfo);
                 var size = info.getZoomSize();
                 console.log(size);
                 this.load.svg(info.key, info.url, {
@@ -69,30 +126,43 @@ var game = new Phaser.Game({
             }
         },
         create: function() {
-            var pressButton;
             {
-                var info = pressButtonInfo;
+                var info = reversiBoardInfo;
                 var center = info.getCenter();
-                var offset = info.getOffset(screenSize);
-                var itemSize = info.getZoomSize();
-                var centerOffset = info.getCenterOffset(screenSize, itemSize);
-                pressButton = this.add.image(
+                var offset = info.getOffset(screenInfo);
+                this.add.image(
                     center.x + offset.x,
-                    center.y + centerOffset.y,
-                    info.key).setInteractive();
+                    center.y + offset.y,
+                    info.key);
+            }
+
+            var blackPiece;
+
+            for (let rowIdx = 0; rowIdx < 8; rowIdx++) {
+                for (let colIdx = 0; colIdx < 8; colIdx++) {
+                    var info = reversiPieceBlackInfo;
+                    var center = info.getCenter();
+                    var offset = info.getBoardIndexOffset(screenInfo, colIdx, rowIdx);
+                    blackPiece = this.add.image(
+                        center.x + offset.x,
+                        center.y + offset.y,
+                        info.key).setInteractive();
+
+                }
             }
         
             this.input.on('gameobjectdown', (pointer, gameobject) => {
-                if (gameobject === pressButton) {
+                if (gameobject === blackPiece) {
                     console.log('d')
                 }
             });
         
             this.input.on('gameobjectup', (pointer, gameobject) => {
-                if (gameobject === pressButton) {
+                if (gameobject === blackPiece) {
                     var scale = !flag ? 0.75 : 1
                     flag = !flag
-                    pressButton.setScale(scale);
+                    blackPiece.setScale(scale);
+                    //blackPiece.setVisible(false);
                     console.log('u')
                 }
             });
