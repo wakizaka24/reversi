@@ -9,11 +9,11 @@ var screenInfo = {
 
 var reversiBoardInfo = {
     key: 'reversi_board',
-    url: 'assets/reversi_board_500x500.svg',
-    width: 500,
-    height: 500,
+    url: 'assets/reversi_board_505x505.svg',
+    width: 505,
+    height: 505,
     borderOffsetRate: {
-        x: 0.008, y: 0.008
+        x: 0.015, y: 0.015
     }
 };
 
@@ -71,21 +71,30 @@ addScreenRateFuncs(reversiPieceBlackInfo);
 addScreenRateFuncs(reversiPieceWhiteInfo);
 
 function addBoardPieceRateFuncs(info) {
+    info['getBorderOffset'] = function() {
+        return {
+            x: screenInfo.width * reversiBoardInfo.borderOffsetRate.x,
+            y: screenInfo.height * reversiBoardInfo.borderOffsetRate.y,
+        }
+    }
+
     info['seekScreenFitZoomRate'] = function (screenInfo) {
-        var offset = this.getOffset(screenInfo);
-        var offsetY = offset.y
-        this['zoomRate'] = (screenInfo.width - offsetY * 2) / 8 / this.width;
+        var offsetX = this.getOffset(screenInfo).x
+            + this.getBorderOffset().x;
+        this['zoomRate'] = (screenInfo.width - offsetX * 2
+            ) / 8 / this.width;
     };
 
     info['getBoardIndexOffset'] = function (screenInfo, colIdx, rowIdx) {
         var zoomSize = this.getZoomSize();
+        var borderOffset = this.getBorderOffset();
         return {
             x: screenInfo.width * screenInfo.offsetRate.x
-                + screenInfo.width * reversiBoardInfo.borderOffsetRate.x
-                + zoomSize.width * colIdx,
-            y: screenInfo.width * screenInfo.offsetRate.y
-                + screenInfo.width * reversiBoardInfo.borderOffsetRate.y
-                + zoomSize.height * rowIdx,
+                + zoomSize.width * colIdx
+                + borderOffset.x,
+            y: screenInfo.height * screenInfo.offsetRate.y
+                + zoomSize.height * rowIdx
+                + borderOffset.y,
         }
     };
 
@@ -124,6 +133,17 @@ var game = new Phaser.Game({
                     height: size.height
                 });
             }
+
+            {
+                var info = reversiPieceWhiteInfo;
+                info.seekScreenFitZoomRate(screenInfo);
+                var size = info.getZoomSize();
+                console.log(size);
+                this.load.svg(info.key, info.url, {
+                    width: size.width,
+                    height: size.height
+                });
+            }
         },
         create: function() {
             {
@@ -143,10 +163,16 @@ var game = new Phaser.Game({
                     var info = reversiPieceBlackInfo;
                     var center = info.getCenter();
                     var offset = info.getBoardIndexOffset(screenInfo, colIdx, rowIdx);
+
                     blackPiece = this.add.image(
                         center.x + offset.x,
                         center.y + offset.y,
                         info.key).setInteractive();
+
+                    // blackPiece = this.add.image(
+                    //     center.x + offset.x,
+                    //     center.y + offset.y,
+                    //     reversiPieceWhiteInfo.key).setInteractive();
 
                 }
             }

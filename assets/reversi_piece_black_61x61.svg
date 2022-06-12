@@ -24,16 +24,25 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="0.87538476"
-     inkscape:cx="138.79611"
-     inkscape:cy="159.3585"
+     inkscape:cx="99.956047"
+     inkscape:cy="141.08082"
      inkscape:window-width="1272"
      inkscape:window-height="679"
-     inkscape:window-x="83"
-     inkscape:window-y="47"
+     inkscape:window-x="84"
+     inkscape:window-y="25"
      inkscape:window-maximized="0"
-     inkscape:current-layer="layer1" />
+     inkscape:current-layer="layer1"
+     scale-x="1" />
   <defs
      id="defs914">
+    <linearGradient
+       id="linearGradient927"
+       inkscape:swatch="solid">
+      <stop
+         style="stop-color:#000000;stop-opacity:1;"
+         offset="0"
+         id="stop925" />
+    </linearGradient>
     <inkscape:path-effect
        effect="bspline"
        id="path-effect2225"
@@ -216,10 +225,10 @@
      inkscape:groupmode="layer"
      id="layer1">
     <circle
-       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:2.55629;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:680.315"
+       style="fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:0;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:680.315;stroke-opacity:1"
        id="path1125"
        cx="30.5"
        cy="30.5"
-       r="27.721855" />
+       r="24.5" />
   </g>
 </svg>
