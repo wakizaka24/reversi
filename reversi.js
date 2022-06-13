@@ -89,15 +89,17 @@ let reversiGaming = {
             this.boardMarix[4][3] = "b";
             this.boardMarix[4][4] = "w";
         },
-        selectPiece: function(rowIdx, colIdx) {
+        selectPiece: function(rowIdx, colIdx, reverceList) {
             let gaming = reversiGaming;
             let states = gaming.states;
 
-            let reverceList = this.getObtainablePiece(rowIdx, colIdx);
-            if (reverceList.length == 0) {
-                return;
+            if (reverceList == null) {
+                reverceList = this.getObtainablePiece(rowIdx, colIdx);
+                if (reverceList.length == 0) {
+                    return false;
+                }
             }
-
+            
             this.boardMarix[rowIdx][colIdx] = !this.turnWhite ? 'b' : 'w';
 
             for (let i in reverceList) {
@@ -111,8 +113,8 @@ let reversiGaming = {
                 }
             }
 
-            gaming.images.reflectPiece(states);
-            states.turnWhite = !states.turnWhite
+            states.turnWhite = !states.turnWhite;
+            return true;
         },
         getObtainablePiece: function(rowIdx, colIdx) {
             let gaming = reversiGaming;
@@ -184,6 +186,25 @@ let reversiGaming = {
             }
 
             return confirmedReverceList;
+        }
+    },
+    pieceSelectionLogic: {
+        getPieceSelections: function(states) {
+            var selections = [];
+            for (let rowIdx in states.boardMarix) {
+                for (let colIdx in states.boardMarix[rowIdx]) {
+                    let reverceList = states.getObtainablePiece(rowIdx, colIdx)
+                    if (reverceList.length > 0) {
+                        selections.push({
+                            index: {
+                                rowIdx: rowIdx, colIdx, colIdx
+                            },
+                            reverceList: reverceList
+                        });
+                    }
+                }
+            }
+            return selections;
         }
     },
     initBoardMatrix: function(matrix, value) {
@@ -346,11 +367,23 @@ let game = new Phaser.Game({
         
             this.input.on('gameobjectup', (pointer, gameobject) => {
                 let gaming = reversiGaming;
+                let images = gaming.images;
                 let states = gaming.states;
-                let index = gaming.images.getPieceIndex(gameobject);
+                let index = images.getPieceIndex(gameobject);
                 console.log(index);
-                states.selectPiece(index.rowIdx, index.colIdx);
-                console.log(states.boardMarix);
+                if (states.selectPiece(index.rowIdx, index.colIdx)) {
+                    console.log(states.boardMarix);
+                    images.reflectPiece(states);
+
+                    let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
+                    if (selections.length > 0) {
+                        let i = Math.floor(Math.random() * selections.length);
+                        let selection = selections[i];
+                        let index = selection.index;
+                        states.selectPiece(index.rowIdx, index.colIdx, selection.reverceList);
+                        images.reflectPiece(states);
+                    }
+                }
                 //console.log('u');
             });
         },
