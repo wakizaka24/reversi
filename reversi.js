@@ -5,6 +5,12 @@ let screenInfo = {
         ? window.innerHeight : window.innerWidth,
     offsetRate: {
         x: 0.05, y: 0.05
+    },
+    getOffset: function () {
+        return {
+            x: this.width * this.offsetRate.x,
+            y: this.width * this.offsetRate.y,
+        }
     }
 };
 
@@ -15,6 +21,16 @@ let reversiBoardInfo = {
     height: 505,
     borderOffsetRate: {
         x: 0.015, y: 0.015
+    },
+    centerTextFontRate: 0.08,
+    getCenterTextFontSize: function (screenInfo) {
+        return screenInfo.width * this.centerTextFontRate;
+    },
+    getBorderOffset: function(screenInfo) {
+        return {
+            x: screenInfo.width * this.borderOffsetRate.x,
+            y: screenInfo.height * this.borderOffsetRate.y,
+        }
     }
 };
 
@@ -213,6 +229,13 @@ let reversiGaming = {
             }
 
             return confirmedReverceList;
+        },
+        getEndingMessage: function() {
+            let counts = this.pieceCounts;
+            let blackWin = counts.black >= counts.white;
+            // Black wins a to b.
+            return (blackWin ? 'Black' : 'White') + ' wins '
+                + counts.black + ' to ' + counts.white + '.';
         }
     },
     pieceSelectionLogic: {
@@ -245,15 +268,8 @@ let reversiGaming = {
 };
 
 function setScreenRateFuncs(info) {
-    info['getOffset'] = function (screenInfo) {
-        return {
-            x: screenInfo.width * screenInfo.offsetRate.x,
-            y: screenInfo.width * screenInfo.offsetRate.y,
-        }
-    };
-
     info['seekScreenFitZoomRate'] = function (screenInfo) {
-        let offset = this.getOffset(screenInfo);
+        let offset = screenInfo.getOffset();
         let offsetY = offset.y
         this['zoomRate'] = (screenInfo.width - offsetY * 2) / this.width;
     };
@@ -271,13 +287,6 @@ function setScreenRateFuncs(info) {
             y: this.getZoomSize().height / 2
         }
     };
-
-    info['getCenterOffset'] = function (screenInfo, zoomSize) {
-        return {
-            x: (screenInfo.width - zoomSize.width) * 0.5,
-            y: (screenInfo.height - zoomSize.height) * 0.5,
-        }
-    };
 };
 setScreenRateFuncs(reversiBoardInfo);
 setScreenRateFuncs(reversiPieceBlankInfo);
@@ -285,23 +294,16 @@ setScreenRateFuncs(reversiPieceBlackInfo);
 setScreenRateFuncs(reversiPieceWhiteInfo);
 
 function setBoardPieceRateFuncs(info) {
-    info['getBorderOffset'] = function() {
-        return {
-            x: screenInfo.width * reversiBoardInfo.borderOffsetRate.x,
-            y: screenInfo.height * reversiBoardInfo.borderOffsetRate.y,
-        }
-    }
-
     info['seekScreenFitZoomRate'] = function (screenInfo) {
-        let offsetX = this.getOffset(screenInfo).x
-            + this.getBorderOffset().x;
+        let offsetX = screenInfo.getOffset().x
+            + reversiBoardInfo.getBorderOffset(screenInfo).x;
         this['zoomRate'] = (screenInfo.width - offsetX * 2
             ) / reversiGaming.pieceLineNum / this.width;
     };
 
     info['getBoardIndexOffset'] = function (screenInfo, colIdx, rowIdx) {
         let zoomSize = this.getZoomSize();
-        let borderOffset = this.getBorderOffset();
+        let borderOffset = reversiBoardInfo.getBorderOffset(screenInfo);
         return {
             x: screenInfo.width * screenInfo.offsetRate.x
                 + zoomSize.width * colIdx
@@ -320,7 +322,7 @@ let game = new Phaser.Game({
     type: Phaser.WEBGL,
     width: screenInfo.width,
     height: screenInfo.height,
-    backgroundColor: '#FAF9F6',
+    backgroundColor: '#faf9f6',
     scene: {
         preload: function() {
             [reversiBoardInfo, reversiPieceBlankInfo, reversiPieceBlackInfo,
@@ -343,7 +345,7 @@ let game = new Phaser.Game({
             {
                 let info = reversiBoardInfo;
                 let center = info.getCenter();
-                let offset = info.getOffset(screenInfo);
+                let offset = screenInfo.getOffset();
                 this.add.image(
                     center.x + offset.x,
                     center.y + offset.y,
@@ -387,6 +389,19 @@ let game = new Phaser.Game({
             }
 
             images.reflectPiece(states);
+
+            let centerText;
+            {
+                let fontSize = reversiBoardInfo.getCenterTextFontSize(screenInfo);
+                //console.log(fontSize);
+                centerText = this.add.text(screenInfo.width / 2,
+                    screenInfo.height / 2, 'Phaser 3')
+                    .setFontSize(fontSize)
+                    .setFontFamily("Arial")
+                    .setColor('#ff00ff')
+                    .setOrigin(0.5)
+                    .setVisible(false);
+            }
         
             // this.input.on('gameobjectdown', (pointer, gameobject) => {
             //     //console.log('d');
@@ -399,10 +414,14 @@ let game = new Phaser.Game({
                 let pieceCounts = states.pieceCounts;
                 let index = images.getPieceIndex(gameobject);
 
+                // let endingMessage = states.getEndingMessage();
+                // centerText.setText(endingMessage);
+                // centerText.setVisible(true);
+
                 if (states.end) {
-                    // states.initStates();
-                    // images.reflectPiece(states);
-                    // console.log('end');
+                    states.initStates();
+                    images.reflectPiece(states);
+                    centerText.setVisible(false);
                     return;
                 }
 
@@ -413,6 +432,28 @@ let game = new Phaser.Game({
                     states.skipping = false;
                     console.log(states.boardMarix);
                     images.reflectPiece(states);
+
+                    function finalProcessing() {
+                        let endingMessage = states.getEndingMessage();
+                        centerText.setText(endingMessage);
+                        centerText.setVisible(true);
+                        states.end = true;
+                    }
+
+                    function checkNextSelections() {
+                        let nextSelections = gaming.pieceSelectionLogic.getPieceSelections(states);
+                        if (nextSelections.length > 0) {
+                            states.skipping = false;
+                        } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
+                            finalProcessing();
+                        } else if (!states.skipping) {
+                            states.turnWhite = !states.turnWhite;
+                            states.skipping = true;
+                            console.log('--- user(skip) ---');
+                        } else {
+                            finalProcessing();
+                        }
+                    }
 
                     let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
                     if (selections.length > 0) {
@@ -427,26 +468,17 @@ let game = new Phaser.Game({
                         console.log(states.boardMarix);
                         images.reflectPiece(states);
 
-                        let nextSelections = gaming.pieceSelectionLogic.getPieceSelections(states);
-                        if (nextSelections.length > 0) {
-                            states.skipping = false;
-                        } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-                            states.end = true;
-                        } else if (!states.skipping) {
-                            states.turnWhite = !states.turnWhite;
-                            states.skipping = true;
-                            console.log('--- user(skip) ---');
-                        } else {
-                            states.end = true;
-                        }
+                        checkNextSelections();
                     } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-                        states.end = true;
+                        finalProcessing();
                     } else if (!states.skipping) {
                         states.turnWhite = !states.turnWhite;
                         states.skipping = true;
                         console.log('--- cpu(skip) ---');
+
+                        checkNextSelections();
                     } else {
-                        states.end = true;
+                        finalProcessing();
                     }
                 }
                 //console.log('u');
