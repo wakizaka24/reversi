@@ -79,15 +79,28 @@ let reversiGaming = {
         }
     },
     states: {
-        turnWhite: false,
         boardMarix: new Array(this.pieceLineNum),
+        pieceCounts: {
+            black: null,
+            white: null,
+            getSum: function() {
+                return this.black + this.white
+            }
+        },
+        turnWhite: false,
+        skipping: false,
+        end: false,
         initStates: function () {
-            this.turnWhite = false;
             reversiGaming.initBoardMatrix(this.boardMarix, "e");
             this.boardMarix[3][3] = "w";
             this.boardMarix[3][4] = "b";
             this.boardMarix[4][3] = "b";
             this.boardMarix[4][4] = "w";
+            this.pieceCounts.black = 2;
+            this.pieceCounts.white = 2;
+            this.turnWhite = false;
+            this.skipping = false;
+            this.end = false;
         },
         selectPiece: function(rowIdx, colIdx, reverceList) {
             let gaming = reversiGaming;
@@ -100,7 +113,13 @@ let reversiGaming = {
                 }
             }
             
-            this.boardMarix[rowIdx][colIdx] = !this.turnWhite ? 'b' : 'w';
+            if (!this.turnWhite) {
+                this.boardMarix[rowIdx][colIdx] = 'b';
+                this.pieceCounts.black++;
+            } else {
+                this.boardMarix[rowIdx][colIdx] = 'w';
+                this.pieceCounts.white++;
+            }
 
             for (let i in reverceList) {
                 let rowIdx = reverceList[i].rowIdx;
@@ -111,6 +130,14 @@ let reversiGaming = {
                 } else if (this.boardMarix[rowIdx][colIdx] == 'w') {
                     this.boardMarix[rowIdx][colIdx] = 'b'
                 }
+            }
+
+            if (!this.turnWhite) {
+                this.pieceCounts.black = this.pieceCounts.black + reverceList.length;
+                this.pieceCounts.white = this.pieceCounts.white - reverceList.length;
+            } else {
+                this.pieceCounts.white = this.pieceCounts.white + reverceList.length;
+                this.pieceCounts.black = this.pieceCounts.black - reverceList.length;
             }
 
             states.turnWhite = !states.turnWhite;
@@ -301,7 +328,7 @@ let game = new Phaser.Game({
             .forEach(info => {
                 info.seekScreenFitZoomRate(screenInfo);
                 let size = info.getZoomSize();
-                console.log(size);
+                //console.log(size);
                 this.load.svg(info.key, info.url, {
                     width: size.width,
                     height: size.height
@@ -369,19 +396,57 @@ let game = new Phaser.Game({
                 let gaming = reversiGaming;
                 let images = gaming.images;
                 let states = gaming.states;
+                let pieceCounts = states.pieceCounts;
                 let index = images.getPieceIndex(gameobject);
-                console.log(index);
+
+                if (states.end) {
+                    // states.initStates();
+                    // images.reflectPiece(states);
+                    // console.log('end');
+                    return;
+                }
+
                 if (states.selectPiece(index.rowIdx, index.colIdx)) {
+                    console.log('--- user ---');
+                    console.log(index);
+
+                    states.skipping = false;
                     console.log(states.boardMarix);
                     images.reflectPiece(states);
 
                     let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
                     if (selections.length > 0) {
+                        states.skipping = false;
                         let i = Math.floor(Math.random() * selections.length);
                         let selection = selections[i];
                         let index = selection.index;
+                        console.log('--- cpu ---');
+                        console.log(index);
+
                         states.selectPiece(index.rowIdx, index.colIdx, selection.reverceList);
+                        console.log(states.boardMarix);
                         images.reflectPiece(states);
+
+                        let nextSelections = gaming.pieceSelectionLogic.getPieceSelections(states);
+                        if (nextSelections.length > 0) {
+                            states.skipping = false;
+                        } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
+                            states.end = true;
+                        } else if (!states.skipping) {
+                            states.turnWhite = !states.turnWhite;
+                            states.skipping = true;
+                            console.log('--- user(skip) ---');
+                        } else {
+                            states.end = true;
+                        }
+                    } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
+                        states.end = true;
+                    } else if (!states.skipping) {
+                        states.turnWhite = !states.turnWhite;
+                        states.skipping = true;
+                        console.log('--- cpu(skip) ---');
+                    } else {
+                        states.end = true;
                     }
                 }
                 //console.log('u');
