@@ -97,6 +97,7 @@ setMultiKeyFuncs(reversiPieceWhiteInfo);
 
 let reversiGaming = {
     pieceLineNum: 8,
+    pieceAnimationWaiting: 10,
     objects: {
         game: null,
         pieces: new Array(this.pieceLineNum),
@@ -105,7 +106,7 @@ let reversiGaming = {
             for (let rowIdx = 0; rowIdx < this.pieces.length; rowIdx++) {
                 for (let colIdx = 0; colIdx < this.pieces[rowIdx].length; colIdx++) {
                     let images = this.pieces[rowIdx][colIdx];
-                    if (images.blank == image) {
+                    if (images.blank[0] == image) {
                         return {
                             rowIdx: rowIdx, colIdx: colIdx
                         };
@@ -125,16 +126,16 @@ let reversiGaming = {
             let piece = this.pieces[rowIdx][colIdx];
             switch (state) {
                 case 'e': // Empty
-                    piece.black.setVisible(false);
-                    piece.white.setVisible(false);
+                    piece.black[0].setVisible(false);
+                    piece.white[0].setVisible(false);
                     break;
                 case 'b': // Black
-                    piece.black.setVisible(true);
-                    piece.white.setVisible(false);
+                    piece.black[0].setVisible(true);
+                    piece.white[0].setVisible(false);
                     break;
                 case 'w': // White
-                    piece.black.setVisible(false);
-                    piece.white.setVisible(true);
+                    piece.black[0].setVisible(false);
+                    piece.white[0].setVisible(true);
                     break;
             }
         },
@@ -145,29 +146,63 @@ let reversiGaming = {
                 let colIdx = change.colIdx;
                 let piece = change.piece;
 
+                let self = this;
+                function _completion() {
+                    self.game.time.delayedCall(0, self.changePieces,
+                        [states, changeList, ++i, completion], self);
+                }
+
                 if (change.skip) {
                     states.boardMarix[rowIdx][colIdx] = piece;
                     this.reflectPiece(states, rowIdx, colIdx);
+                    _completion();
                 } else {
                     if (piece == 'w') {
-                        this.changeBlackToWhite(states, rowIdx, colIdx);
+                        this.changePieceAnimation(states, 'black', 'white', 'w',
+                        rowIdx, colIdx, 1, _completion);
                     } else if (piece == 'b') {
-                        this.changeWhiteToBlack(states, rowIdx, colIdx);
+                        this.changePieceAnimation(states, 'white', 'black', 'b',
+                        rowIdx, colIdx, 1, _completion);
                     }
                 }
-                this.game.time.delayedCall(100, this.changePieces,
-                    [states, changeList, ++i, completion], this);
             } else {
                 completion(states);
             }
         },
-        changeBlackToWhite: function(states, rowIdx, colIdx) {
-            states.boardMarix[rowIdx][colIdx] = "w";
-            this.reflectPiece(states, rowIdx, colIdx);
-        },
-        changeWhiteToBlack: function(states, rowIdx, colIdx) {
-            states.boardMarix[rowIdx][colIdx] = "b";
-            this.reflectPiece(states, rowIdx, colIdx);
+        changePieceAnimation: function(states, from, to, piece, rowIdx, colIdx, i, completion) {
+            /*
+            let frameList = [
+                {type: from, f:0}, {type: from, f:1}, {type: from, f:2}, {type: from, f:3},
+                {type: from, f:4}, {type: from, f:5}, {type: from, f:6}, {type: from, f:7},
+                {type: from, f:8}, {type: from, f:9}, {type: from, f:10}, {type: from, f:11},
+                {type: from, f:12},
+                {type: to, f:12}, {type: to, f:11}, {type: to, f:10}, {type: to, f:9},
+                {type: to, f:8}, {type: to, f:7}, {type: to, f:6}, {type: to, f:5},
+                {type: to, f:4}, {type: to, f:3}, {type: to, f:2}, {type: to, f:1},
+                {type: to, f:0}
+            ];
+            */
+
+            let frameList = [
+                {type: from, f:0}, {type: from, f:3}, {type: from, f:6}, {type: from, f:9},
+                {type: from, f:12},
+                {type: to, f:12},  {type: to, f:9}, {type: to, f:6}, {type: to, f:3},
+                {type: to, f:0}
+            ];
+
+            if (i < frameList.length) {
+                states.boardMarix[rowIdx][colIdx] = piece;
+
+                let prevFrame = frameList[i - 1];
+                this.pieces[rowIdx][colIdx][prevFrame.type][prevFrame.f].setVisible(false);
+                let frame = frameList[i];
+                this.pieces[rowIdx][colIdx][frame.type][frame.f].setVisible(true);
+
+                this.game.time.delayedCall(0, this.changePieceAnimation,
+                    [states, from, to, piece, rowIdx, colIdx, ++i, completion], this);
+            } else {
+                completion();
+            }
         }
     },
     states: {
@@ -472,20 +507,35 @@ let game = new Phaser.Game({
                             let center = info.getCenter();
                             let offset = info.getBoardIndexOffset(screenInfo, colIdx, rowIdx);
     
-                            t.piece.push(this.add.image(
-                                center.x + offset.x,
-                                center.y + offset.y,
-                                info.getFirstKey()));
-                            if (t.interactive) {
-                                t.piece[0].setInteractive()
+                            let urls = info.urls;
+                            if (urls) {
+                                for (let i = 0; i < urls.length; i++) {
+                                    t.piece.push(this.add.image(
+                                        center.x + offset.x,
+                                        center.y + offset.y,
+                                        info.getKey(i)));
+                                    if (t.interactive) {
+                                        t.piece[i].setInteractive()
+                                    }
+                                    t.piece[i].setVisible(t.visible);
+                                }
+                            } else {
+                                t.piece.push(this.add.image(
+                                    center.x + offset.x,
+                                    center.y + offset.y,
+                                    info.getFirstKey()));
+                                if (t.interactive) {
+                                    t.piece[0].setInteractive()
+                                }
+                                t.piece[0].setVisible(t.visible);
                             }
-                            t.piece[0].setVisible(t.visible);
                         });
 
-                    pieces[rowIdx][colIdx] = Object.keys(images).reduce((current, key) => {
-                        current[key] = images[key][0];
-                        return current;
-                    }, {});
+                    // pieces[rowIdx][colIdx] = Object.keys(images).reduce((current, key) => {
+                    //     current[key] = images[key][0];
+                    //     return current;
+                    // }, {});
+                    pieces[rowIdx][colIdx] = images;
                 }
             }
 
@@ -532,11 +582,13 @@ let game = new Phaser.Game({
     
                         states.skipping = false;
                         console.log(states.boardMarix);
-                        objects.reflectPieces(states);
     
                         let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
                         if (selections.length > 0) {
-                            objects.game.time.delayedCall(500, afterPieceSelection, [selections]);
+                            //let maxMs = 750;
+                            let minMs = 250;
+                            //let ms = (maxMs - minMs + 1) * Math.random() + minMs;
+                            objects.game.time.delayedCall(minMs, afterPieceSelection, [selections]);
                         } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
                             finalProcessing();
                         } else if (!states.skipping) {
@@ -600,7 +652,6 @@ function afterPieceSelection(selections) {
     states.selectPiece(index.rowIdx, index.colIdx, selection.reverceList, function(result) {
         if (result) {
             console.log(states.boardMarix);
-            objects.reflectPieces(states);
         
             checkNextSelections();
         }
