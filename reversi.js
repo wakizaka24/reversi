@@ -42,26 +42,68 @@ let reversiPieceBlankInfo = {
 }
 
 let reversiPieceBlackInfo = {
-    key: 'reversi_piece_black',
-    url: 'assets/reversi_piece_black_61x61.svg',
+    keyBase: 'reversi_piece_black',
+    urls: ['assets/reversi_piece_black_01_61x61.svg',
+        'assets/reversi_piece_black_02_61x61.svg',
+        'assets/reversi_piece_black_03_61x61.svg',
+        'assets/reversi_piece_black_04_61x61.svg',
+        'assets/reversi_piece_black_05_61x61.svg',
+        'assets/reversi_piece_black_06_61x61.svg',
+        'assets/reversi_piece_black_07_61x61.svg',
+        'assets/reversi_piece_black_08_61x61.svg',
+        'assets/reversi_piece_black_09_61x61.svg',
+        'assets/reversi_piece_black_10_61x61.svg',
+        'assets/reversi_piece_black_11_61x61.svg',
+        'assets/reversi_piece_black_12_61x61.svg',
+        'assets/reversi_piece_black_13_61x61.svg'],
     width: 61,
     height: 61
 }
 
 let reversiPieceWhiteInfo = {
-    key: 'reversi_piece_white',
-    url: 'assets/reversi_piece_white_61x61.svg',
+    keyBase: 'reversi_piece_white',
+    urls: ['assets/reversi_piece_white_01_61x61.svg',
+        'assets/reversi_piece_white_02_61x61.svg',
+        'assets/reversi_piece_white_03_61x61.svg',
+        'assets/reversi_piece_white_04_61x61.svg',
+        'assets/reversi_piece_white_05_61x61.svg',
+        'assets/reversi_piece_white_06_61x61.svg',
+        'assets/reversi_piece_white_07_61x61.svg',
+        'assets/reversi_piece_white_08_61x61.svg',
+        'assets/reversi_piece_white_09_61x61.svg',
+        'assets/reversi_piece_white_10_61x61.svg',
+        'assets/reversi_piece_white_11_61x61.svg',
+        'assets/reversi_piece_white_12_61x61.svg',
+        'assets/reversi_piece_white_13_61x61.svg'],
     width: 61,
     height: 61
 }
 
+function setMultiKeyFuncs(info) {
+    info['getKey'] = function (i) {
+        return this.keyBase + "_" + String(i).padStart(2, '0');
+    };
+    info['getFirstKey'] = function() {
+        if (this.urls) {
+            return this.getKey(0);
+        } else {
+            return this.key;
+        }
+    }
+};
+setMultiKeyFuncs(reversiPieceBlankInfo);
+setMultiKeyFuncs(reversiPieceBlackInfo);
+setMultiKeyFuncs(reversiPieceWhiteInfo);
+
 let reversiGaming = {
     pieceLineNum: 8,
-    images: {
+    objects: {
+        game: null,
         pieces: new Array(this.pieceLineNum),
+        centerText: null,
         getPieceIndex: function(image) {
-            for (let rowIdx in this.pieces) {
-                for (let colIdx in this.pieces[rowIdx]) {
+            for (let rowIdx = 0; rowIdx < this.pieces.length; rowIdx++) {
+                for (let colIdx = 0; colIdx < this.pieces[rowIdx].length; colIdx++) {
                     let images = this.pieces[rowIdx][colIdx];
                     if (images.blank == image) {
                         return {
@@ -71,27 +113,61 @@ let reversiGaming = {
                 }
             }
         },
-        reflectPiece: function(states) {
-            for (let rowIdx in this.pieces) {
-                for (let colIdx in this.pieces[rowIdx]) {
-                    let state = states.boardMarix[rowIdx][colIdx];
-                    let piece = this.pieces[rowIdx][colIdx];
-                    switch (state) {
-                        case 'e': // Empty
-                            piece.black.setVisible(false);
-                            piece.white.setVisible(false);
-                            break;
-                        case 'b': // Black
-                            piece.black.setVisible(true);
-                            piece.white.setVisible(false);
-                            break;
-                        case 'w': // White
-                            piece.black.setVisible(false);
-                            piece.white.setVisible(true);
-                            break;
-                    }
+        reflectPieces: function(states) {
+            for (let rowIdx = 0; rowIdx < this.pieces.length; rowIdx++) {
+                for (let colIdx = 0; colIdx < this.pieces[rowIdx].length; colIdx++) {
+                    this.reflectPiece(states, rowIdx, colIdx);
                 }
             }
+        },
+        reflectPiece: function(states, rowIdx, colIdx) {
+            let state = states.boardMarix[rowIdx][colIdx];
+            let piece = this.pieces[rowIdx][colIdx];
+            switch (state) {
+                case 'e': // Empty
+                    piece.black.setVisible(false);
+                    piece.white.setVisible(false);
+                    break;
+                case 'b': // Black
+                    piece.black.setVisible(true);
+                    piece.white.setVisible(false);
+                    break;
+                case 'w': // White
+                    piece.black.setVisible(false);
+                    piece.white.setVisible(true);
+                    break;
+            }
+        },
+        changePieces: function(states, changeList, i, completion) {
+            if (i < changeList.length) {
+                let change = changeList[i];
+                let rowIdx = change.rowIdx;
+                let colIdx = change.colIdx;
+                let piece = change.piece;
+
+                if (change.skip) {
+                    states.boardMarix[rowIdx][colIdx] = piece;
+                    this.reflectPiece(states, rowIdx, colIdx);
+                } else {
+                    if (piece == 'w') {
+                        this.changeBlackToWhite(states, rowIdx, colIdx);
+                    } else if (piece == 'b') {
+                        this.changeWhiteToBlack(states, rowIdx, colIdx);
+                    }
+                }
+                this.game.time.delayedCall(100, this.changePieces,
+                    [states, changeList, ++i, completion], this);
+            } else {
+                completion(states);
+            }
+        },
+        changeBlackToWhite: function(states, rowIdx, colIdx) {
+            states.boardMarix[rowIdx][colIdx] = "w";
+            this.reflectPiece(states, rowIdx, colIdx);
+        },
+        changeWhiteToBlack: function(states, rowIdx, colIdx) {
+            states.boardMarix[rowIdx][colIdx] = "b";
+            this.reflectPiece(states, rowIdx, colIdx);
         }
     },
     states: {
@@ -118,22 +194,24 @@ let reversiGaming = {
             this.skipping = false;
             this.end = false;
         },
-        selectPiece: function(rowIdx, colIdx, reverceList) {
+        selectPiece: function(rowIdx, colIdx, reverceList, completion) {
             let gaming = reversiGaming;
             let states = gaming.states;
 
             if (reverceList == null) {
                 reverceList = this.getObtainablePiece(rowIdx, colIdx);
                 if (reverceList.length == 0) {
-                    return false;
+                    completion(false);
+                    return;
                 }
             }
-            
+
+            var changeList = [];
             if (!this.turnWhite) {
-                this.boardMarix[rowIdx][colIdx] = 'b';
+                changeList.push({rowIdx: rowIdx, colIdx: colIdx, piece: 'b', skip: true});
                 this.pieceCounts.black++;
             } else {
-                this.boardMarix[rowIdx][colIdx] = 'w';
+                changeList.push({rowIdx: rowIdx, colIdx: colIdx, piece: 'w', skip: true});
                 this.pieceCounts.white++;
             }
 
@@ -142,9 +220,9 @@ let reversiGaming = {
                 let colIdx = reverceList[i].colIdx;
 
                 if (this.boardMarix[rowIdx][colIdx] == 'b') {
-                    this.boardMarix[rowIdx][colIdx] = 'w'
+                    changeList.push({rowIdx: rowIdx, colIdx: colIdx, piece: 'w', skip: false});
                 } else if (this.boardMarix[rowIdx][colIdx] == 'w') {
-                    this.boardMarix[rowIdx][colIdx] = 'b'
+                    changeList.push({rowIdx: rowIdx, colIdx: colIdx, piece: 'b', skip: false});
                 }
             }
 
@@ -156,8 +234,10 @@ let reversiGaming = {
                 this.pieceCounts.black = this.pieceCounts.black - reverceList.length;
             }
 
-            states.turnWhite = !states.turnWhite;
-            return true;
+            gaming.objects.changePieces(states, changeList, 0, function(states) {
+                states.turnWhite = !states.turnWhite;
+                completion(true);
+            });
         },
         getObtainablePiece: function(rowIdx, colIdx) {
             let gaming = reversiGaming;
@@ -241,8 +321,9 @@ let reversiGaming = {
     pieceSelectionLogic: {
         getPieceSelections: function(states) {
             var selections = [];
-            for (let rowIdx in states.boardMarix) {
-                for (let colIdx in states.boardMarix[rowIdx]) {
+            let boardMarix = states.boardMarix;
+            for (let rowIdx = 0; rowIdx < boardMarix.length; rowIdx++) {
+                for (let colIdx = 0; colIdx < boardMarix[rowIdx].length; colIdx++) {
                     let reverceList = states.getObtainablePiece(rowIdx, colIdx)
                     if (reverceList.length > 0) {
                         selections.push({
@@ -331,15 +412,35 @@ let game = new Phaser.Game({
                 info.seekScreenFitZoomRate(screenInfo);
                 let size = info.getZoomSize();
                 //console.log(size);
-                this.load.svg(info.key, info.url, {
-                    width: size.width,
-                    height: size.height
-                });
+
+                var images = [];
+                if (info.urls) {
+                    for (let i in info.urls) {
+                        images.push({
+                            key: info.getKey(i), url: info.urls[i]
+                        });
+                    }
+                } else {
+                    images.push({
+                        key: info.key, url: info.url
+                    });
+                }
+
+                for (let i in images) {
+                    let image = images[i];
+                    this.load.svg(image.key, image.url, {
+                        width: size.width,
+                        height: size.height
+                    });
+                }
             })
         },
         create: function() {
             let gaming = reversiGaming;
             let states = gaming.states;
+
+            gaming.objects.game = this;
+
             states.initStates();
 
             {
@@ -352,11 +453,11 @@ let game = new Phaser.Game({
                     info.key);
             }
 
-            let images = gaming.images;
-            let pieces = images.pieces;
+            let objects = gaming.objects;
+            let pieces = objects.pieces;
             gaming.initBoardMatrix(pieces, null);
-            for (let rowIdx in pieces) {
-                for (let colIdx in pieces[rowIdx]) {
+            for (let rowIdx = 0; rowIdx < pieces.length; rowIdx++) {
+                for (let colIdx = 0; colIdx < pieces[rowIdx].length; colIdx++) {
                     let images = {
                         blank: [],
                         black: [],
@@ -374,7 +475,7 @@ let game = new Phaser.Game({
                             t.piece.push(this.add.image(
                                 center.x + offset.x,
                                 center.y + offset.y,
-                                info.key));
+                                info.getFirstKey()));
                             if (t.interactive) {
                                 t.piece[0].setInteractive()
                             }
@@ -388,13 +489,12 @@ let game = new Phaser.Game({
                 }
             }
 
-            images.reflectPiece(states);
+            objects.reflectPieces(states);
 
-            let centerText;
             {
                 let fontSize = reversiBoardInfo.getCenterTextFontSize(screenInfo);
                 //console.log(fontSize);
-                centerText = this.add.text(screenInfo.width / 2,
+                objects.centerText = this.add.text(screenInfo.width / 2,
                     screenInfo.height / 2, 'Phaser 3')
                     .setFontSize(fontSize)
                     .setFontFamily("Arial")
@@ -409,78 +509,47 @@ let game = new Phaser.Game({
         
             this.input.on('gameobjectup', (pointer, gameobject) => {
                 let gaming = reversiGaming;
-                let images = gaming.images;
+                let objects = gaming.objects;
                 let states = gaming.states;
                 let pieceCounts = states.pieceCounts;
-                let index = images.getPieceIndex(gameobject);
+                let index = objects.getPieceIndex(gameobject);
 
                 // let endingMessage = states.getEndingMessage();
-                // centerText.setText(endingMessage);
-                // centerText.setVisible(true);
+                // objects.centerText.setText(endingMessage);
+                // objects.centerText.setVisible(true);
 
                 if (states.end) {
                     states.initStates();
-                    images.reflectPiece(states);
-                    centerText.setVisible(false);
+                    objects.reflectPieces(states);
+                    objects.centerText.setVisible(false);
                     return;
                 }
 
-                if (states.selectPiece(index.rowIdx, index.colIdx)) {
-                    console.log('--- user ---');
-                    console.log(index);
-
-                    states.skipping = false;
-                    console.log(states.boardMarix);
-                    images.reflectPiece(states);
-
-                    function finalProcessing() {
-                        let endingMessage = states.getEndingMessage();
-                        centerText.setText(endingMessage);
-                        centerText.setVisible(true);
-                        states.end = true;
-                    }
-
-                    function checkNextSelections() {
-                        let nextSelections = gaming.pieceSelectionLogic.getPieceSelections(states);
-                        if (nextSelections.length > 0) {
-                            states.skipping = false;
+                states.selectPiece(index.rowIdx, index.colIdx, null, function(result) {
+                    if (result) {
+                        console.log('--- user ---');
+                        console.log(index);
+    
+                        states.skipping = false;
+                        console.log(states.boardMarix);
+                        objects.reflectPieces(states);
+    
+                        let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
+                        if (selections.length > 0) {
+                            objects.game.time.delayedCall(500, afterPieceSelection, [selections]);
                         } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
                             finalProcessing();
                         } else if (!states.skipping) {
                             states.turnWhite = !states.turnWhite;
                             states.skipping = true;
-                            console.log('--- user(skip) ---');
+                            console.log('--- cpu(skip) ---');
+    
+                            checkNextSelections();
                         } else {
                             finalProcessing();
                         }
                     }
-
-                    let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
-                    if (selections.length > 0) {
-                        states.skipping = false;
-                        let i = Math.floor(Math.random() * selections.length);
-                        let selection = selections[i];
-                        let index = selection.index;
-                        console.log('--- cpu ---');
-                        console.log(index);
-
-                        states.selectPiece(index.rowIdx, index.colIdx, selection.reverceList);
-                        console.log(states.boardMarix);
-                        images.reflectPiece(states);
-
-                        checkNextSelections();
-                    } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-                        finalProcessing();
-                    } else if (!states.skipping) {
-                        states.turnWhite = !states.turnWhite;
-                        states.skipping = true;
-                        console.log('--- cpu(skip) ---');
-
-                        checkNextSelections();
-                    } else {
-                        finalProcessing();
-                    }
-                }
+                });
                 //console.log('u');
             });
         },
@@ -489,3 +558,51 @@ let game = new Phaser.Game({
         }
     }
 });
+
+function finalProcessing() {
+    let gaming = reversiGaming;
+    let states = gaming.states;
+    let objects = gaming.objects;
+    let endingMessage = states.getEndingMessage();
+    objects.centerText.setText(endingMessage);
+    objects.centerText.setVisible(true);
+    states.end = true;
+}
+
+function checkNextSelections() {
+    let gaming = reversiGaming;
+    let states = gaming.states;
+    let nextSelections = gaming.pieceSelectionLogic.getPieceSelections(states);
+    if (nextSelections.length > 0) {
+        states.skipping = false;
+    } else if (states.pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
+        finalProcessing();
+    } else if (!states.skipping) {
+        states.turnWhite = !states.turnWhite;
+        states.skipping = true;
+        console.log('--- user(skip) ---');
+    } else {
+        finalProcessing();
+    }
+}
+
+function afterPieceSelection(selections) {
+    let gaming = reversiGaming;
+    let objects = gaming.objects;
+    let states = gaming.states;
+    states.skipping = false;
+    let i = Math.floor(Math.random() * selections.length);
+    let selection = selections[i];
+    let index = selection.index;
+    console.log('--- cpu ---');
+    console.log(index);
+
+    states.selectPiece(index.rowIdx, index.colIdx, selection.reverceList, function(result) {
+        if (result) {
+            console.log(states.boardMarix);
+            objects.reflectPieces(states);
+        
+            checkNextSelections();
+        }
+    });
+}
