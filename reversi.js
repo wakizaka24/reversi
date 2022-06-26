@@ -6,6 +6,12 @@ let screenInfo = {
     offsetRate: {
         x: 0.05, y: 0.05
     },
+    initSize: function() {
+        this.width = window.innerWidth <= window.innerHeight
+            ? window.innerWidth : window.innerHeight;
+        this.height = window.innerHeight <= window.innerWidth
+            ? window.innerHeight : window.innerWidth;
+    },
     getOffset: function () {
         return {
             x: this.width * this.offsetRate.x,
@@ -97,7 +103,7 @@ setMultiKeyFuncs(reversiPieceWhiteInfo);
 
 let reversiGaming = {
     pieceLineNum: 8,
-    pieceAnimationWaiting: 10,
+    testMode: true,
     objects: {
         game: null,
         pieces: new Array(this.pieceLineNum),
@@ -473,6 +479,8 @@ let game = new Phaser.Game({
         create: function() {
             let gaming = reversiGaming;
             let states = gaming.states;
+            let objects = gaming.objects;
+            let pieces = objects.pieces;
 
             gaming.objects.game = this;
 
@@ -488,8 +496,6 @@ let game = new Phaser.Game({
                     info.key);
             }
 
-            let objects = gaming.objects;
-            let pieces = objects.pieces;
             gaming.initBoardMatrix(pieces, null);
             for (let rowIdx = 0; rowIdx < pieces.length; rowIdx++) {
                 for (let colIdx = 0; colIdx < pieces[rowIdx].length; colIdx++) {
@@ -569,9 +575,7 @@ let game = new Phaser.Game({
                 // objects.centerText.setVisible(true);
 
                 if (states.end) {
-                    states.initStates();
-                    objects.reflectPieces(states);
-                    objects.centerText.setVisible(false);
+                    initGame();
                     return;
                 }
 
@@ -583,33 +587,56 @@ let game = new Phaser.Game({
                         states.skipping = false;
                         console.log(states.boardMarix);
     
-                        let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
-                        if (selections.length > 0) {
-                            //let maxMs = 750;
-                            let minMs = 250;
-                            //let ms = (maxMs - minMs + 1) * Math.random() + minMs;
-                            objects.game.time.delayedCall(minMs, afterPieceSelection, [selections]);
-                        } else if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-                            finalProcessing();
-                        } else if (!states.skipping) {
-                            states.turnWhite = !states.turnWhite;
-                            states.skipping = true;
-                            console.log('--- cpu(skip) ---');
-    
-                            checkNextSelections();
-                        } else {
-                            finalProcessing();
+                        let found = selectPieceByCpu();
+                        if (!found) {
+                            if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
+                                finalProcessing();
+                            } else if (!states.skipping) {
+                                states.turnWhite = !states.turnWhite;
+                                states.skipping = true;
+                                console.log('--- cpu(skip) ---');
+        
+                                checkNextSelections();
+                            } else {
+                                finalProcessing();
+                            }
                         }
                     }
                 });
                 //console.log('u');
             });
+
+            if (gaming.testMode) {
+                this.input.enabled = false;
+                selectPieceByCpu();
+            }
         },
         update: function() {
             //console.log('update')
         }
     }
 });
+
+window.addEventListener("orientationchange", () => {
+    screenInfo.initSize();
+    game.scale.refresh();
+});
+
+function selectPieceByCpu() {
+    let gaming = reversiGaming;
+    let objects = gaming.objects;
+    let states = gaming.states;
+
+    let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
+    if (selections.length > 0) {
+        //let maxMs = 750;
+        let minMs = 250;
+        //let ms = (maxMs - minMs + 1) * Math.random() + minMs;
+        objects.game.time.delayedCall(minMs, afterPieceSelection, [selections]);
+        return true;
+    }
+    return false;
+}
 
 function finalProcessing() {
     let gaming = reversiGaming;
@@ -619,6 +646,11 @@ function finalProcessing() {
     objects.centerText.setText(endingMessage);
     objects.centerText.setVisible(true);
     states.end = true;
+
+    if (gaming.testMode) {
+        states.end = false;
+        objects.game.time.delayedCall(1000, initGame, []);
+    }
 }
 
 function checkNextSelections() {
@@ -629,18 +661,20 @@ function checkNextSelections() {
         states.skipping = false;
     } else if (states.pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
         finalProcessing();
+        return false;
     } else if (!states.skipping) {
         states.turnWhite = !states.turnWhite;
         states.skipping = true;
         console.log('--- user(skip) ---');
     } else {
         finalProcessing();
+        return false;
     }
+    return true;
 }
 
 function afterPieceSelection(selections) {
     let gaming = reversiGaming;
-    let objects = gaming.objects;
     let states = gaming.states;
     states.skipping = false;
     let i = Math.floor(Math.random() * selections.length);
@@ -653,7 +687,25 @@ function afterPieceSelection(selections) {
         if (result) {
             console.log(states.boardMarix);
         
-            checkNextSelections();
+            if (checkNextSelections()) {
+                if (gaming.testMode) {
+                    selectPieceByCpu();
+                }
+            }
         }
     });
+}
+
+function initGame() {
+    let gaming = reversiGaming;
+    let states = gaming.states;
+    let objects = gaming.objects;
+
+    states.initStates();
+    objects.reflectPieces(states);
+    objects.centerText.setVisible(false);
+
+    if (gaming.testMode) {
+        selectPieceByCpu();
+    }
 }
