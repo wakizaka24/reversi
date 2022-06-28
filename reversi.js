@@ -224,11 +224,14 @@ let reversiGaming = {
         skipping: false,
         end: false,
         initStates: function () {
-            reversiGaming.initBoardMatrix(this.boardMarix, "e");
-            this.boardMarix[3][3] = "w";
-            this.boardMarix[3][4] = "b";
-            this.boardMarix[4][3] = "b";
-            this.boardMarix[4][4] = "w";
+            let gaming = reversiGaming;
+            gaming.initBoardMatrix(this.boardMarix, "e");
+            let topLeftIdx = (gaming.pieceLineNum / 2)  - 1;
+            let bottomRightIdx = (gaming.pieceLineNum / 2);
+            this.boardMarix[topLeftIdx][topLeftIdx] = "w";
+            this.boardMarix[topLeftIdx][bottomRightIdx] = "b";
+            this.boardMarix[bottomRightIdx][topLeftIdx] = "b";
+            this.boardMarix[bottomRightIdx][bottomRightIdx] = "w";
             this.pieceCounts.black = 2;
             this.pieceCounts.white = 2;
             this.turnWhite = false;
@@ -567,7 +570,6 @@ let game = new Phaser.Game({
                 let gaming = reversiGaming;
                 let objects = gaming.objects;
                 let states = gaming.states;
-                let pieceCounts = states.pieceCounts;
                 let index = objects.getPieceIndex(gameobject);
 
                 // let endingMessage = states.getEndingMessage();
@@ -583,24 +585,9 @@ let game = new Phaser.Game({
                     if (result) {
                         console.log('--- user ---');
                         console.log(index);
-    
-                        states.skipping = false;
                         console.log(states.boardMarix);
-    
-                        let found = selectPieceByCpu();
-                        if (!found) {
-                            if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-                                finalProcessing();
-                            } else if (!states.skipping) {
-                                states.turnWhite = !states.turnWhite;
-                                states.skipping = true;
-                                console.log('--- cpu(skip) ---');
-        
-                                checkNextSelections();
-                            } else {
-                                finalProcessing();
-                            }
-                        }
+ 
+                        cpuTurn();
                     }
                 });
                 //console.log('u');
@@ -608,7 +595,7 @@ let game = new Phaser.Game({
 
             if (gaming.testMode) {
                 this.input.enabled = false;
-                selectPieceByCpu();
+                cpuTurn();
             }
         },
         update: function() {
@@ -617,41 +604,10 @@ let game = new Phaser.Game({
     }
 });
 
-window.addEventListener("orientationchange", () => {
-    screenInfo.initSize();
-    game.scale.refresh();
-});
-
-function selectPieceByCpu() {
-    let gaming = reversiGaming;
-    let objects = gaming.objects;
-    let states = gaming.states;
-
-    let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
-    if (selections.length > 0) {
-        //let maxMs = 750;
-        let minMs = 250;
-        //let ms = (maxMs - minMs + 1) * Math.random() + minMs;
-        objects.game.time.delayedCall(minMs, afterPieceSelection, [selections]);
-        return true;
-    }
-    return false;
-}
-
-function finalProcessing() {
-    let gaming = reversiGaming;
-    let states = gaming.states;
-    let objects = gaming.objects;
-    let endingMessage = states.getEndingMessage();
-    objects.centerText.setText(endingMessage);
-    objects.centerText.setVisible(true);
-    states.end = true;
-
-    if (gaming.testMode) {
-        states.end = false;
-        objects.game.time.delayedCall(1000, initGame, []);
-    }
-}
+// window.addEventListener("orientationchange", () => {
+//     screenInfo.initSize();
+//     game.scale.refresh();
+// });
 
 function checkNextSelections() {
     let gaming = reversiGaming;
@@ -673,6 +629,37 @@ function checkNextSelections() {
     return true;
 }
 
+function cpuTurn() {
+    let gaming = reversiGaming;
+    let objects = gaming.objects;
+    let states = gaming.states;
+    let pieceCounts = states.pieceCounts;
+
+    let selections = gaming.pieceSelectionLogic.getPieceSelections(states);
+    if (selections.length > 0) {
+        //let maxMs = 750;
+        let minMs = 250;
+        //let ms = (maxMs - minMs + 1) * Math.random() + minMs;
+        objects.game.time.delayedCall(minMs, afterPieceSelection, [selections]);
+    } else {
+        if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
+            finalProcessing();
+        } else if (!states.skipping) {
+            states.turnWhite = !states.turnWhite;
+            states.skipping = true;
+            console.log('--- cpu(skip) ---');
+
+            if (checkNextSelections) {
+                if (gaming.testMode) {
+                    cpuTurn();
+                }
+            }
+        } else {
+            finalProcessing();
+        }
+    }
+}
+
 function afterPieceSelection(selections) {
     let gaming = reversiGaming;
     let states = gaming.states;
@@ -689,11 +676,26 @@ function afterPieceSelection(selections) {
         
             if (checkNextSelections()) {
                 if (gaming.testMode) {
-                    selectPieceByCpu();
+                    cpuTurn();
                 }
             }
         }
     });
+}
+
+function finalProcessing() {
+    let gaming = reversiGaming;
+    let states = gaming.states;
+    let objects = gaming.objects;
+    let endingMessage = states.getEndingMessage();
+    objects.centerText.setText(endingMessage);
+    objects.centerText.setVisible(true);
+    states.end = true;
+
+    if (gaming.testMode) {
+        states.end = false;
+        objects.game.time.delayedCall(1000, initGame, []);
+    }
 }
 
 function initGame() {
@@ -706,6 +708,6 @@ function initGame() {
     objects.centerText.setVisible(false);
 
     if (gaming.testMode) {
-        selectPieceByCpu();
+        cpuTurn();
     }
 }
