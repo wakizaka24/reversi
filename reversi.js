@@ -87,15 +87,12 @@ let reversiPieceWhiteInfo = {
 
 function setMultiKeyFuncs(info) {
     info['getKey'] = function (i) {
-        return this.keyBase + "_" + String(i).padStart(2, '0');
-    };
-    info['getFirstKey'] = function() {
         if (this.urls) {
-            return this.getKey(0);
+            return this.keyBase + "_" + String(i).padStart(2, '0');
         } else {
             return this.key;
         }
-    }
+    };
 };
 setMultiKeyFuncs(reversiPieceBlankInfo);
 setMultiKeyFuncs(reversiPieceBlackInfo);
@@ -104,6 +101,7 @@ setMultiKeyFuncs(reversiPieceWhiteInfo);
 let reversiGaming = {
     pieceLineNum: 8,
     testMode: false,
+    vsMode: false,
     objects: {
         game: null,
         pieces: new Array(this.pieceLineNum),
@@ -176,19 +174,6 @@ let reversiGaming = {
             }
         },
         changePieceAnimation: function(states, from, to, piece, rowIdx, colIdx, i, completion) {
-            /*
-            let frameList = [
-                {type: from, f:0}, {type: from, f:1}, {type: from, f:2}, {type: from, f:3},
-                {type: from, f:4}, {type: from, f:5}, {type: from, f:6}, {type: from, f:7},
-                {type: from, f:8}, {type: from, f:9}, {type: from, f:10}, {type: from, f:11},
-                {type: from, f:12},
-                {type: to, f:12}, {type: to, f:11}, {type: to, f:10}, {type: to, f:9},
-                {type: to, f:8}, {type: to, f:7}, {type: to, f:6}, {type: to, f:5},
-                {type: to, f:4}, {type: to, f:3}, {type: to, f:2}, {type: to, f:1},
-                {type: to, f:0}
-            ];
-            */
-
             let frameList = [
                 {type: from, f:0}, {type: from, f:3}, {type: from, f:6}, {type: from, f:9},
                 {type: from, f:12},
@@ -380,73 +365,6 @@ let reversiGaming = {
                 }
             }
             return selections;
-        },
-        expactPieceSelections: function(gaming, selections, level) {
-            let states = gaming.states;
-            let max = gaming.pieceLineNum - 1;
-            let maxm = max - 1;
-
-            let rLevel1Idxs = [
-                {rowIdx: 0, colIdx: 0}, {rowIdx: 0, colIdx: max},
-                {rowIdx: max, colIdx: 0}, {rowIdx: max, colIdx: max}
-            ];
-            var _selections = selections;
-            var filteringSelections = _selections.filter(function (selection) {
-                return rLevel1Idxs.filter(function (idxs) {
-                    return selection.index.rowIdx == idxs.rowIdx
-                    && selection.index.colIdx == idxs.colIdx
-                }).length > 0;
-            });
-            if (filteringSelections.length > 0) {
-                return filteringSelections; 
-            }
-
-            let nRLevel2Idxs = [
-                {rowIdx: 0, colIdx: 1}, {rowIdx: 1, colIdx: 0}, {rowIdx: 1, colIdx: 1},
-                {rowIdx: max, colIdx:  1}, {rowIdx: maxm, colIdx: 0}, {rowIdx: maxm, colIdx: 1},
-                {rowIdx: 1, colIdx: max}, {rowIdx: 0, colIdx: maxm}, {rowIdx: 1, colIdx: maxm},
-                {rowIdx: maxm, colIdx: max}, {rowIdx: max, colIdx: maxm}, {rowIdx: maxm, colIdx: maxm}];
-            filteringSelections = selections.filter(function (selection) {
-                let c1 = nRLevel2Idxs.filter(function (idxs) {
-                    return selection.index.rowIdx == idxs.rowIdx
-                    && selection.index.colIdx == idxs.colIdx;
-                }).length > 0;
-
-                let c2 = nRLevel2Idxs.filter(function (idxs) {
-                    return selection.reverceList.filter (function(index) {
-                        return idxs.rowIdx == index.rowIdx
-                        && idxs.colIdx == index.colIdx;
-                    }).length > 0;
-                }).length > 0;
-
-                let c = !(c1 || c2);
-
-                if (!c) {
-                    console.log('c1=' + c1 + ' c2=' + c2);
-                    console.log(selection);
-                }
-
-                return c;
-            });
-            if (filteringSelections.length > 0) {
-                _selections = filteringSelections; 
-            }
-
-            var minNum = gaming.pieceLineNum ** 2;
-            _selections.forEach(function (selection) {
-                let count = selection.reverceList.length;
-                if (count < minNum) {
-                    minNum = count;
-                }
-            });
-            var filteringSelections = _selections.filter(function (selection) {
-                return selection.reverceList.length == minNum;                
-            });
-            if (filteringSelections.length > 0) {
-                _selections = filteringSelections; 
-            }
-
-            return _selections
         }
     },
     initBoardMatrix: function(matrix, value) {
@@ -579,38 +497,31 @@ let game = new Phaser.Game({
                         {info: reversiPieceBlackInfo, piece: images.black, visible: false, interactive: false},
                         {info: reversiPieceWhiteInfo, piece: images.white, visible: false, interactive: false}]
                         .forEach(t => {
-                            let info = t.info;
-                            let center = info.getCenter();
-                            let offset = info.getBoardIndexOffset(screenInfo, colIdx, rowIdx);
-    
-                            let urls = info.urls;
-                            if (urls) {
-                                for (let i = 0; i < urls.length; i++) {
-                                    t.piece.push(this.add.image(
-                                        center.x + offset.x,
-                                        center.y + offset.y,
-                                        info.getKey(i)));
-                                    if (t.interactive) {
-                                        t.piece[i].setInteractive()
-                                    }
-                                    t.piece[i].setVisible(t.visible);
-                                }
-                            } else {
-                                t.piece.push(this.add.image(
+                            function addPiece(scenes, t, i) {
+                                let info = t.info;
+                                let center = info.getCenter();
+                                let offset = info.getBoardIndexOffset(screenInfo, colIdx, rowIdx);
+
+                                t.piece.push(scenes.add.image(
                                     center.x + offset.x,
                                     center.y + offset.y,
-                                    info.getFirstKey()));
+                                    info.getKey(i)));
                                 if (t.interactive) {
-                                    t.piece[0].setInteractive()
+                                    t.piece[i].setInteractive()
                                 }
-                                t.piece[0].setVisible(t.visible);
+                                t.piece[i].setVisible(t.visible);
+                            }
+
+                            let urls = t.info.urls;
+                            if (urls) {
+                                for (let i = 0; i < urls.length; i++) {
+                                    addPiece(this, t, i);
+                                }
+                            } else {
+                                addPiece(this, t, 0);
                             }
                         });
 
-                    // pieces[rowIdx][colIdx] = Object.keys(images).reduce((current, key) => {
-                    //     current[key] = images[key][0];
-                    //     return current;
-                    // }, {});
                     pieces[rowIdx][colIdx] = images;
                 }
             }
@@ -639,10 +550,6 @@ let game = new Phaser.Game({
                 let states = gaming.states;
                 let index = objects.getPieceIndex(gameobject);
 
-                // let endingMessage = states.getEndingMessage();
-                // objects.centerText.setText(endingMessage);
-                // objects.centerText.setVisible(true);
-
                 if (states.end) {
                     initGame();
                     return;
@@ -653,8 +560,9 @@ let game = new Phaser.Game({
                         // console.log('--- user ---');
                         // console.log(index);
                         // console.log(states.boardMarix);
- 
-                        cpuTurn();
+                        if (!gaming.vsMode) {
+                            cpuTurn(this);
+                        }
                     }
                 });
                 //console.log('u');
@@ -662,7 +570,7 @@ let game = new Phaser.Game({
 
             if (gaming.testMode) {
                 this.input.enabled = false;
-                cpuTurn();
+                cpuTurn(this);
             }
         },
         update: function() {
@@ -671,12 +579,7 @@ let game = new Phaser.Game({
     }
 });
 
-// window.addEventListener("orientationchange", () => {
-//     screenInfo.initSize();
-//     game.scale.refresh();
-// });
-
-function cpuTurn() {
+function cpuTurn(scenes) {
     let gaming = reversiGaming;
     let objects = gaming.objects;
     let states = gaming.states;
@@ -685,37 +588,35 @@ function cpuTurn() {
 
     var selections = logic.getPieceSelections(states);
     if (selections.length > 0) {
-        if (states.turnWhite) {
-            selections = logic.expactPieceSelections(gaming, selections, 0);
-        }
+        let maxMs = 250;
+        let minMs = 0;
+        let ms = (maxMs - minMs + 1) * Math.random() + minMs;
 
-        //let maxMs = 750;
-        let minMs = 250;
-        //let ms = (maxMs - minMs + 1) * Math.random() + minMs;
-        objects.game.time.delayedCall(minMs, afterPieceSelection, [selections]);
+        if (states.testMode) {
+            ms = 0;
+        }
+        objects.game.time.delayedCall(ms, afterPieceSelection, [scenes, selections]);
     } else {
         if (pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-            finalProcessing();
+            finalProcessing(scenes);
         } else if (!states.skipping) {
             states.turnWhite = !states.turnWhite;
             states.skipping = true;
             console.log('--- cpu(skip) ---');
 
-            if (checkNextSelections) {
-                if (gaming.testMode) {
-                    cpuTurn();
-                }
-            }
+            checkNextSelections(scenes)
         } else {
-            finalProcessing();
+            finalProcessing(scenes);
         }
     }
 }
 
-function afterPieceSelection(selections) {
+function afterPieceSelection(scenes, selections) {
     let gaming = reversiGaming;
     let states = gaming.states;
+    
     states.skipping = false;
+
     let i = Math.floor(Math.random() * selections.length);
     let selection = selections[i];
     let index = selection.index;
@@ -726,36 +627,38 @@ function afterPieceSelection(selections) {
         if (result) {
             // console.log(states.boardMarix);
         
-            if (checkNextSelections()) {
+            if (checkNextSelections(scenes)) {
                 if (gaming.testMode) {
-                    cpuTurn();
+                    cpuTurn(scenes);
                 }
             }
         }
     });
 }
 
-function checkNextSelections() {
+function checkNextSelections(scenes) {
     let gaming = reversiGaming;
     let states = gaming.states;
     let nextSelections = gaming.pieceSelectionLogic.getPieceSelections(states);
     if (nextSelections.length > 0) {
         states.skipping = false;
     } else if (states.pieceCounts.getSum() == gaming.pieceLineNum ** 2) {
-        finalProcessing();
+        finalProcessing(scenes);
         return false;
     } else if (!states.skipping) {
         states.turnWhite = !states.turnWhite;
         states.skipping = true;
         console.log('--- user(skip) ---');
+
+        cpuTurn(scenes);
     } else {
-        finalProcessing();
+        finalProcessing(scenes);
         return false;
     }
     return true;
 }
 
-function finalProcessing() {
+function finalProcessing(scenes) {
     let gaming = reversiGaming;
     let states = gaming.states;
     let objects = gaming.objects;
@@ -765,12 +668,11 @@ function finalProcessing() {
     states.end = true;
 
     if (gaming.testMode) {
-        states.end = false;
-        objects.game.time.delayedCall(1000, initGame, []);
+        scenes.input.enabled = true;
     }
 }
 
-function initGame() {
+function initGame(scenes) {
     let gaming = reversiGaming;
     let states = gaming.states;
     let objects = gaming.objects;
@@ -780,6 +682,6 @@ function initGame() {
     objects.centerText.setVisible(false);
 
     if (gaming.testMode) {
-        cpuTurn();
+        cpuTurn(scenes);
     }
 }
