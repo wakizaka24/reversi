@@ -1,0 +1,7 @@
+{
+    "name": "dev container",
+    "dockerComposeFile": "../docker/docker-compose.yml",
+    "service": "web",
+    "workspaceFolder": "/var/www/html",
+    "remoteUser": "root"
+}

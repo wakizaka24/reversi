@@ -1,2 +1,1 @@
-#!/usr/bin/bash
-php -S localhost:3000 -t ./
+php -S localhost:8080 -t ..
